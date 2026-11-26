@@ -1,0 +1,89 @@
+name: "Antigravity CodeRabbit Autofix"
+description: "Automatically resolve unresolved CodeRabbit review comments using the Google Antigravity SDK."
+author: "asabon"
+
+branding:
+  icon: "check-circle"
+  color: "blue"
+
+inputs:
+  github-token:
+    description: "GitHub token with contents: write and pull-requests: write permissions."
+    required: true
+    default: ${{ github.token }}
+  antigravity-api-key:
+    description: "API key for Antigravity / Gemini. Optional if using self-hosted local auth or GCP ADC."
+    required: false
+    default: ""
+  max-attempts:
+    description: "Maximum number of auto-fix commits allowed per PR to prevent infinite review loops."
+    required: false
+    default: "3"
+  ignore-nitpicks:
+    description: "Skip low-severity suggestions marked as nitpicks ([nitpick] / 🧹 Nitpick)."
+    required: false
+    default: "true"
+  deny-write-paths:
+    description: "Comma-separated glob patterns that the agent is strictly forbidden from modifying."
+    required: false
+    default: ".github/**,*.lock,.env*"
+  protect-tests:
+    description: "Block the agent from modifying or deleting existing test files to bypass failures."
+    required: false
+    default: "true"
+  test-command:
+    description: "Shell command executed to verify fixes before committing (e.g., pytest, npm test)."
+    required: false
+    default: ""
+  commit-message:
+    description: "Commit message used when pushing automated fixes."
+    required: false
+    default: "fix: address CodeRabbit review feedback via Antigravity"
+  auto-resolve:
+    description: "Automatically mark fixed review threads as resolved on GitHub."
+    required: false
+    default: "true"
+
+outputs:
+  fixed-count:
+    description: "Number of CodeRabbit review threads successfully fixed and committed."
+    value: ${{ steps.autofix.outputs.fixed-count }}
+  skipped-count:
+    description: "Number of review threads skipped or deferred to human review."
+    value: ${{ steps.autofix.outputs.skipped-count }}
+  remaining-threads:
+    description: "Count of unresolved CodeRabbit review threads remaining on the PR."
+    value: ${{ steps.autofix.outputs.remaining-threads }}
+  commit-sha:
+    description: "The SHA of the created fix commit (empty if no changes were committed)."
+    value: ${{ steps.autofix.outputs.commit-sha }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.11"
+
+    - name: Install dependencies
+      shell: bash
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install --no-cache-dir "${{ github.action_path }}"
+
+    - name: Run Antigravity CodeRabbit Autofix
+      id: autofix
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+        ANTIGRAVITY_API_KEY: ${{ inputs.antigravity-api-key }}
+        INPUT_MAX_ATTEMPTS: ${{ inputs.max-attempts }}
+        INPUT_IGNORE_NITPICKS: ${{ inputs.ignore-nitpicks }}
+        INPUT_DENY_WRITE_PATHS: ${{ inputs.deny-write-paths }}
+        INPUT_PROTECT_TESTS: ${{ inputs.protect-tests }}
+        INPUT_TEST_COMMAND: ${{ inputs.test-command }}
+        INPUT_COMMIT_MESSAGE: ${{ inputs.commit-message }}
+        INPUT_AUTO_RESOLVE: ${{ inputs.auto-resolve }}
+        PYTHONPATH: ${{ github.action_path }}
+      run: python -m src.main
