@@ -1,0 +1,36 @@
+name: Auto-fix CodeRabbit Reviews
+
+on:
+  pull_request_review:
+    types: [submitted]
+
+concurrency:
+  group: coderabbit-autofix-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  autofix:
+    if: >
+      github.event.review.user.login == 'coderabbitai[bot]' &&
+      github.event.review.state != 'approved' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+
+      - name: Run Antigravity CodeRabbit Autofix
+        uses: ./
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          antigravity-api-key: ${{ secrets.ANTIGRAVITY_API_KEY }}
+          test-command: "python -m pip install -q pytest pytest-asyncio && pytest"
+          max-attempts: "3"
+          ignore-nitpicks: "true"
